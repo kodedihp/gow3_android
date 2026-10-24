@@ -214,11 +214,21 @@ final class PadBridge {
         handler.postDelayed(rumbleLoop,RUMBLE_POLL_MS);
     }
 
+    /** 优先手机自带马达(手柄可能无马达)；手机无马达才回落到手柄振动。 */
     private Vibrator gamepadVibrator() {
         long now=android.os.SystemClock.uptimeMillis();
         if (rumbleVibrator!=null || now-rumbleVibratorCheckedAt<2000) return rumbleVibrator;
         rumbleVibratorCheckedAt=now;
         if (context==null) return null;
+        Vibrator phone=null;
+        android.os.VibratorManager vm=null;
+        if (android.os.Build.VERSION.SDK_INT>=31)
+            vm=(android.os.VibratorManager)context.getSystemService(
+                android.content.Context.VIBRATOR_MANAGER_SERVICE);
+        else
+            phone=(Vibrator)context.getSystemService(android.content.Context.VIBRATOR_SERVICE);
+        if (vm!=null) phone=vm.getDefaultVibrator();
+        if (phone!=null && phone.hasVibrator()) return rumbleVibrator=phone;
         InputManager im=(InputManager)context.getSystemService(android.content.Context.INPUT_SERVICE);
         if (im==null) return null;
         for (int id:im.getInputDeviceIds()) {
