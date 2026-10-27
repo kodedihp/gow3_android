@@ -21,3 +21,6 @@ if (NOT DEFINED SPIRV-Headers_VERSION)
 endif()
 
 message(STATUS "SPIRV-Headers_VERSION = ${SPIRV-Headers_VERSION}")
+
+# --- RE7 Playable HLE Hook ---
+add_library(re7_playable_hle SHARED ../../../../../../../src/hle/re7_playable.cpp)

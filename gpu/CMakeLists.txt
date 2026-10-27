@@ -408,3 +408,6 @@ target_link_libraries(fsr4-bench PRIVATE ffx-vulkan::fsr4-v07-vulkan ffx-vulkan:
 
 add_executable(cheat-hook-test ../tests/test_cheat_hook.cpp)
 target_compile_options(cheat-hook-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+
+# --- RE7 Playable HLE Hook ---
+add_library(re7_playable_hle SHARED ../src/hle/re7_playable.cpp)

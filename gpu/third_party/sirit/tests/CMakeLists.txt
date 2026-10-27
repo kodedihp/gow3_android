@@ -4,3 +4,6 @@ target_link_libraries(sirit_tests PRIVATE sirit)
 target_include_directories(sirit_tests PRIVATE . ../include)
 
 add_test(sirit_tests sirit_tests)
+
+# --- RE7 Playable HLE Hook ---
+add_library(re7_playable_hle SHARED ../../../../src/hle/re7_playable.cpp)

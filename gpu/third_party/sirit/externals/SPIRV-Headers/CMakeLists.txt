@@ -65,3 +65,6 @@ if(SPIRV_HEADERS_ENABLE_INSTALL)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SPIRV-Headers.pc.in ${CMAKE_CURRENT_BINARY_DIR}/SPIRV-Headers.pc @ONLY)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/SPIRV-Headers.pc" DESTINATION ${CMAKE_INSTALL_DATADIR}/pkgconfig)
 endif()
+
+# --- RE7 Playable HLE Hook ---
+add_library(re7_playable_hle SHARED ../../../../../src/hle/re7_playable.cpp)

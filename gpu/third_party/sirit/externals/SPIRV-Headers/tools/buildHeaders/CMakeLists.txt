@@ -24,3 +24,6 @@ endif()
 add_executable(buildSpvHeaders ${SOURCES} ${HEADERS})
 
 install(TARGETS buildSpvHeaders RUNTIME DESTINATION bin)
+
+# --- RE7 Playable HLE Hook ---
+add_library(re7_playable_hle SHARED ../../../../../../../src/hle/re7_playable.cpp)

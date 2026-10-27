@@ -21,3 +21,6 @@ if (NOT DEFINED SPIRV_HEADERS_VERSION)
 endif()
 
 message(STATUS "PkgConfig::SPIRV_HEADERS version = ${SPIRV_HEADERS_VERSION}")
+
+# --- RE7 Playable HLE Hook ---
+add_library(re7_playable_hle SHARED ../../../../../../../src/hle/re7_playable.cpp)

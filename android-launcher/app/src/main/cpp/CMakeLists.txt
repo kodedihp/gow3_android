@@ -36,3 +36,6 @@ foreach(target gow3present gow3prepare)
     target_link_options(${target} PRIVATE
             -Wl,--gc-sections -Wl,-z,max-page-size=16384)
 endforeach()
+
+# --- RE7 Playable HLE Hook ---
+add_library(re7_playable_hle SHARED ../../../../../src/hle/re7_playable.cpp)

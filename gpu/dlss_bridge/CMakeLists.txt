@@ -28,3 +28,6 @@ add_library(gow3_dlss SHARED gow3_dlss_bridge.cpp gow3_dlss_bridge.h)
 target_include_directories(gow3_dlss PRIVATE "${DLSS_SDK_ROOT}/include" "${VULKAN_INCLUDE}")
 target_link_libraries(gow3_dlss PRIVATE "${DLSS_SDK_ROOT}/lib/Windows_x86_64/x64/nvsdk_ngx_s.lib")
 target_compile_definitions(gow3_dlss PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+
+# --- RE7 Playable HLE Hook ---
+add_library(re7_playable_hle SHARED ../../src/hle/re7_playable.cpp)

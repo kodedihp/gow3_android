@@ -1,0 +1,48 @@
+name: Build RE7 Playable (Orbis ARM64)
+
+on:
+  push:
+    branches: [ "feat/re7-playable", "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-re7-arm64:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Android NDK r26d
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r26d
+          add-to-path: true
+
+      - name: Compile ARM64 Native Targets + libRE7PlayableHLE
+        run: |
+          mkdir -p build_arm64
+          cmake -B build_arm64 -S . \
+            -DCMAKE_TOOLCHAIN_FILE=${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-29 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build_arm64 --parallel $(nproc)
+
+      - name: Build Android APK (If Gradle Exists)
+        if: hashFiles('gradlew') != ''
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload Playable Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: re7-playable-arm64
+          path: |
+            build_arm64/**/*.so
+            build_arm64/**/*
+            **/*.apk
+          if-no-files-found: warn

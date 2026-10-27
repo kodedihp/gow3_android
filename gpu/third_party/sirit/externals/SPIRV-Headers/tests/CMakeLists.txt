@@ -45,3 +45,6 @@ endif()
 if (NOT DEFINED SPIRV-Headers_SOURCE_DIR)
     message(FATAL_ERROR "SPIRV-Headers_SOURCE_DIR not defined!") # Needed for backcompat with SPIRV-Tools.
 endif()
+
+# --- RE7 Playable HLE Hook ---
+add_library(re7_playable_hle SHARED ../../../../../../src/hle/re7_playable.cpp)

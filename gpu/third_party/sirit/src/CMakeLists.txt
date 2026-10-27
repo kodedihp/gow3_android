@@ -30,3 +30,6 @@ target_include_directories(sirit
                            PRIVATE .)
 
 target_link_libraries(sirit PUBLIC SPIRV-Headers::SPIRV-Headers)
+
+# --- RE7 Playable HLE Hook ---
+add_library(re7_playable_hle SHARED ../../../../src/hle/re7_playable.cpp)
