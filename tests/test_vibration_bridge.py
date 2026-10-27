@@ -10,6 +10,7 @@ RUN_BIONIC = ROOT / "tools/android/device/run-bionic.sh"
 SETTINGS_CPP = ROOT / "gpu/shim/gow3_settings.cpp"
 SETTINGS_H = ROOT / "gpu/shim/gow3_settings.h"
 GOW3_GPU = ROOT / "gpu/shim/gow3gpu.cpp"
+MANIFEST = ROOT / "android-launcher/app/src/main/AndroidManifest.xml"
 
 
 class VibrationSettingsContractTest(unittest.TestCase):
@@ -77,6 +78,22 @@ class RumbleBridgeContractTest(unittest.TestCase):
         # 只摘轮询回调，不破坏 write() 的 8ms 合并
         self.assertIn("handler.removeCallbacks(rumbleLoop)", source)
         self.assertNotIn("removeCallbacksAndMessages(null)", source)
+
+    def test_phone_vibrator_preferred_over_controller(self):
+        """震动目标优先手机自带马达（手柄可能无马达），无马达才回落到手柄振动。"""
+        source = PAD_BRIDGE.read_text()
+        # API 31+ VibratorManager.getDefaultVibrator，低版本 VIBRATOR_SERVICE
+        self.assertIn("android.content.Context.VIBRATOR_MANAGER_SERVICE", source)
+        self.assertIn("vm.getDefaultVibrator()", source)
+        self.assertIn("android.content.Context.VIBRATOR_SERVICE", source)
+        # 手机马达可用时直接返回，不再遍历手柄
+        self.assertIn("if (phone!=null && phone.hasVibrator()) return rumbleVibrator=phone;", source)
+        self.assertLess(source.index("vm.getDefaultVibrator()"),
+                        source.index("dev.getVibrator()"))
+
+    def test_manifest_declares_vibrate_permission(self):
+        """手机振动需要 android.permission.VIBRATE。"""
+        self.assertIn('android.permission.VIBRATE', MANIFEST.read_text())
 
     def test_activity_lifecycle_pairs_start_and_stop(self):
         source = GAME_ACTIVITY.read_text()
