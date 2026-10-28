@@ -29,7 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 
 /** 求 Star 与问题反馈，跳转到作者 GitHub 仓库 / Issues 页面。 */
 @Composable

@@ -3,7 +3,7 @@ package com.gow3.android.data
 import com.gow3.android.data.model.ProjectRepo
 
 
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL

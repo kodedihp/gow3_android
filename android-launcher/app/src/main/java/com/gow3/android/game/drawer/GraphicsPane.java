@@ -6,7 +6,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import com.gow3.android.R;
+import com.resident.evil7.bionic.R;
 import com.gow3.android.core.settings.FrameGenSettings;
 
 /** Graphics tab：帧生成（内联开关 + 自定义倍数/质量两行横排选项，就地调整即时生效，不弹二级对话框）、

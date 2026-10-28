@@ -543,7 +543,7 @@ void* ResolveBySymbolName(const char* name) {
 void* ResolveByNID(const char* nid11) {
     if (!nid11) return nullptr;
     InitializeRE7Subsystem();
-    std::string key(nid11, std::strnlen(nid11, 11));
+    std::string key(nid11, ::strnlen(nid11, 11));
     auto it = g_nidMap.find(key);
     return (it != g_nidMap.end()) ? it->second : nullptr;
 }

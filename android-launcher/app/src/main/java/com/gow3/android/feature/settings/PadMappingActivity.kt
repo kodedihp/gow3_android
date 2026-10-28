@@ -1,6 +1,6 @@
 package com.gow3.android.feature.settings
 
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 import com.gow3.android.core.settings.GamePrefs
 import com.gow3.android.core.settings.LanguageManager
 import com.gow3.android.game.PadMapping

@@ -37,7 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 
 /**
  * 单行参数编辑控件，Settings 配置页按分类复用：多值参数用下拉、布尔参数用开关。

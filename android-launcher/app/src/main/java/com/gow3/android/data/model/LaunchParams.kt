@@ -3,7 +3,7 @@ package com.gow3.android.data.model
 import com.gow3.android.data.PatchCatalog
 
 
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 
 /**
  * 启动参数的顶层类别，驱动 Settings 配置页顶部的分类 tab 栏。

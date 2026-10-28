@@ -7,7 +7,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import androidx.annotation.StringRes;
-import com.gow3.android.R;
+import com.resident.evil7.bionic.R;
 
 /** Game tab：继续游戏 / 重启游戏 / 退出游戏。重启与退出带确认对话框。 */
 final class GamePane implements DrawerPane {

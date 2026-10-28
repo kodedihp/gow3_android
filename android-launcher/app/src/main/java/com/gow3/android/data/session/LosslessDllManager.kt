@@ -8,7 +8,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 import java.io.File
 
 /** 按运行时解析顺序，记录有效 Lossless.dll 被发现的位置。 */

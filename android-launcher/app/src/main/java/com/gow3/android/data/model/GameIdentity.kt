@@ -3,7 +3,7 @@ package com.gow3.android.data.model
 import com.gow3.android.data.CatalogProblem
 import com.gow3.android.data.PatchCatalog
 import com.gow3.android.data.PatchCatalogException
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 
 import java.io.File
 import java.io.InputStream

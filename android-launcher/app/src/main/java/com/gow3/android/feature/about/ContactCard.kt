@@ -31,7 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 
 private const val AUTHOR = "zfitness"
 private const val QQ_GROUP = "1105902080"

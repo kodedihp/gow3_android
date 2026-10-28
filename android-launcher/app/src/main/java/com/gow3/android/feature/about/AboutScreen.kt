@@ -36,8 +36,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.gow3.android.BuildConfig
-import com.gow3.android.R
+import com.resident.evil7.bionic.BuildConfig
+import com.resident.evil7.bionic.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

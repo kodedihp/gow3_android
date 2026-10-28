@@ -50,7 +50,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 
 private enum class LauncherTab { HOME, SETTINGS, MODS, ABOUT }
 

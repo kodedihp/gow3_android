@@ -11,7 +11,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import com.gow3.android.R;
+import com.resident.evil7.bionic.R;
 import java.util.HashMap;
 import java.util.Map;
 

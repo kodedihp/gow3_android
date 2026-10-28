@@ -25,7 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 
 /**
  * Settings「操作」分类的按键映射功能卡（slot `pad_mapping`，add-pad-button-mapping）。

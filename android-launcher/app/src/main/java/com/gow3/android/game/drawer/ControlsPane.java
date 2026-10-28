@@ -5,7 +5,7 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import com.gow3.android.R;
+import com.resident.evil7.bionic.R;
 
 /** Controls tab：屏幕控制器开关、编辑布局、重置布局。 */
 final class ControlsPane implements DrawerPane {

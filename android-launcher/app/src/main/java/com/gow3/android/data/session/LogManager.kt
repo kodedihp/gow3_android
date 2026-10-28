@@ -10,7 +10,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException

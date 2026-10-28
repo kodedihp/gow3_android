@@ -16,7 +16,7 @@ import android.os.Environment
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 import java.io.File
 
 /** 负责首次运行时的游戏目录校验、存储权限和目录选择器状态。 */

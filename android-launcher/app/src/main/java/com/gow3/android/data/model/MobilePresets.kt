@@ -3,7 +3,7 @@ package com.gow3.android.data.model
 import com.gow3.android.data.PatchCatalog
 
 
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 
 internal data class MobilePreset(val resolution: String, val labelRes: Int) {
     // 预设只管分辨率档位（经 render_resolution 联动选择分辨率补丁）与六项特效补丁；

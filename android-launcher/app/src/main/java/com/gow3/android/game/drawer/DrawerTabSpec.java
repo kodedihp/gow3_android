@@ -2,7 +2,7 @@ package com.gow3.android.game.drawer;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.StringRes;
-import com.gow3.android.R;
+import com.resident.evil7.bionic.R;
 
 /** tab 的规格表：把 DrawerTab 映射到图标与文案资源，供 rail 构建使用。 */
 public final class DrawerTabSpec {

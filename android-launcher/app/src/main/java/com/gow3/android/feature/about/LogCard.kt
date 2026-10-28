@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.gow3.android.R
+import com.resident.evil7.bionic.R
 
 /** 将 launcher 的 God of War III 运行时日志（例如 android-game.log）导出为 zip，或直接分享。 */
 @Composable
