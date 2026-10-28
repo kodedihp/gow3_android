@@ -143,7 +143,8 @@ fi
 cp -f "$prefix/lib/libSDL3.so" "$out/lib/"
 cp -f "$llvm/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" "$out/lib/"
 
-cc=("$llvm/bin/aarch64-linux-android$api-clang" -fuse-ld=lld)
+cc=("$llvm/bin/aarch64-linux-android$api-clang")
+ld=(-fuse-ld=lld)
 if (( need_atrac9 )); then
     mkdir -p "$out/atrac9"
     for source in third_party/LibAtrac9/C/src/*.c; do
@@ -163,12 +164,12 @@ read -r -a pv_libraries <<< "$(pkg-config --libs libavcodec libavutil libswscale
 links=(-L"$out/lib" -lgow3gpu -lgow3cpu -lc++_shared -Wl,-rpath,'$ORIGIN/../lib' -rdynamic -pie)
 "${cc[@]}" -std=c++17 -O2 -g -Wall -Wextra -Werror -pthread -I"$prefix/include" -I. -Isrc \
     "${pv_includes[@]}" -c src/hle/re7_playable.cpp -o "$out/re7_playable.o"
-"${cc[@]}" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -I"$prefix/include" -I. -Isrc \
+"${cc[@]}" "${ld[@]}" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -I"$prefix/include" -I. -Isrc \
     "${pv_includes[@]}" \
     src/probe.c src/runtime*.c src/vulkan_smoke.c "$out/re7_playable.o" "$out/libatrac9.a" -lm -lz "${links[@]}" \
     "${pv_libraries[@]}" \
     -o "$out/bin/gow3-probe"
-"${cc[@]}" -std=c11 -O2 -Wall -Wextra -Werror tools/android/build/kgsl_chip_id.c -pie \
+"${cc[@]}" "${ld[@]}" -std=c11 -O2 -Wall -Wextra -Werror tools/android/build/kgsl_chip_id.c -pie \
     -o "$out/bin/kgsl-chip-id"
 # 帧生成引擎（change add-native-frame-generation）：libbloodframe.so（MIT，钉 commit，
 # 首次构建需网络 clone）。runtime-manifest 将其列为必需——失败即失败，不静默缺库。
