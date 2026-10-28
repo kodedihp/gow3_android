@@ -241,6 +241,24 @@ int32_t ORBIS_ABI sceKernelVirtualQuery(const void* addr, int32_t flags, SceKern
     return -13;
 }
 
+struct SceLibcHeapTraceInfo {
+    uint64_t size;
+    uint32_t flag;
+    uint32_t getSegmentInfo;
+    uint64_t* mspaceAtomicIdMask;
+    uint64_t* mstateTable;
+};
+
+static uint64_t g_libcMspaceAtomicIdMask = 0;
+static uint64_t g_libcMstateTable[64] = {};
+
+void ORBIS_ABI sceLibcHeapGetTraceInfo(SceLibcHeapTraceInfo* info) {
+    if (!info) return;
+    info->mspaceAtomicIdMask = &g_libcMspaceAtomicIdMask;
+    info->mstateTable = g_libcMstateTable;
+    info->getSegmentInfo = 0;
+}
+
 struct OrbisEqueue {
     std::mutex mtx;
     std::vector<SceKernelEvent> triggeredEvents;
@@ -491,6 +509,7 @@ void InitializeRE7Subsystem() {
         REG_RE7(sceKernelMapFlexibleMemory);
         REG_RE7(sceKernelMapNamedFlexibleMemory);
         REG_RE7(sceKernelVirtualQuery);
+        REG_RE7(sceLibcHeapGetTraceInfo);
         REG_RE7(sceKernelCreateEqueue);
         REG_RE7(sceKernelDeleteEqueue);
         REG_RE7(sceKernelAddUserEvent);

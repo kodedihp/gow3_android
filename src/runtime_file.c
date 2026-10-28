@@ -47,7 +47,7 @@ typedef struct {
 _Static_assert(sizeof(GuestStat)==120,"FreeBSD stat layout");
 
 typedef struct { char *names; size_t count, *offsets; unsigned char *types; } Listing;
-typedef struct { int used, host; Listing *dir; size_t position; char path[512]; } File;
+typedef struct { int used, host, flags; Listing *dir; size_t position; char path[512]; } File;
 typedef struct { char guest[64]; char host[512]; } Mount;
 static File files[MAX_FILES];
 static Mount mounts[MAX_MOUNTS];
@@ -241,7 +241,7 @@ static int64_t do_open(const char *guest,int flags,int mode) {
     int fd=-1;
     for (int i=3;i<MAX_FILES;++i) if (!files[i].used) { fd=i; break; }
     if (fd<0) { pthread_mutex_unlock(&lock); if (host>=0) close(host); free_listing(dir); return -EMFILE; }
-    files[fd]=(File){.used=1,.host=host,.dir=dir};
+    files[fd]=(File){.used=1,.host=host,.flags=flags,.dir=dir};
     snprintf(files[fd].path,sizeof(files[fd].path),"%s",guest);
     ++opens;
     pthread_mutex_unlock(&lock);
@@ -439,6 +439,67 @@ static int64_t do_truncate(const char *guest,int64_t length) {
 #endif
 }
 static int64_t do_fsync(int fd) { int h=host_fd(fd); if (h<0) return -EBADF; return fsync(h) ? -errno : 0; }
+/* FreeBSD's fcntl command numbers differ from Linux's: 0/17 duplicate, 1-4 are
+ * FD flags and file status flags. Lock commands stay unsupported rather than
+ * pretending the lock was taken. */
+static int64_t do_fcntl(int fd,int cmd,intptr_t arg) {
+    if (fd>=0 && fd<3) {
+        switch (cmd) {
+        case 1: return 0; /* F_GETFD */
+        case 2: return 0; /* F_SETFD */
+        case 3: return 0; /* F_GETFL: stdio is left as opened */
+        default: return -EINVAL;
+        }
+    }
+    pthread_mutex_lock(&lock);
+    File *f=get(fd);
+    if (!f) { pthread_mutex_unlock(&lock); return -EBADF; }
+    switch (cmd) {
+    case 0: case 17: { /* F_DUPFD, F_DUPFD_CLOEXEC */
+        if (f->dir || arg<0 || arg>=MAX_FILES) { pthread_mutex_unlock(&lock); return -EINVAL; }
+        int first=(int)arg<3 ? 3 : (int)arg;
+#ifndef _WIN32
+        int host=fcntl(f->host,cmd==17 ? F_DUPFD_CLOEXEC : F_DUPFD,first);
+#else
+        int host=_dup(f->host);
+#endif
+        if (host<0) { int e=errno; pthread_mutex_unlock(&lock); return -e; }
+        int slot=-1;
+        for (int i=first;i<MAX_FILES;++i) if (!files[i].used) { slot=i; break; }
+        if (slot<0) { close(host); pthread_mutex_unlock(&lock); return -EMFILE; }
+        files[slot]=(File){.used=1,.host=host,.flags=f->flags};
+        snprintf(files[slot].path,sizeof(files[slot].path),"%s",f->path);
+        pthread_mutex_unlock(&lock);
+        return slot;
+    }
+    case 1: pthread_mutex_unlock(&lock); return 0; /* F_GETFD */
+    case 2: pthread_mutex_unlock(&lock); return 0; /* F_SETFD */
+    case 3: { /* F_GETFL */
+        int value=f->flags & (0x3|0x4|0x8|0x80);
+        pthread_mutex_unlock(&lock);
+        return value;
+    }
+    case 4: { /* F_SETFL */
+        int value=(int)arg;
+        if (value & ~(0x3|0x4|0x8|0x80)) { pthread_mutex_unlock(&lock); return -EINVAL; }
+#ifndef _WIN32
+        int host=fcntl(f->host,F_GETFL);
+        if (host<0) { int e=errno; pthread_mutex_unlock(&lock); return -e; }
+        host&=~(O_NONBLOCK|O_APPEND|O_SYNC);
+        if (value&0x4) host|=O_NONBLOCK;
+        if (value&0x8) host|=O_APPEND;
+        if (value&0x80) host|=O_SYNC;
+        if (fcntl(f->host,F_SETFL,host)) { int e=errno; pthread_mutex_unlock(&lock); return -e; }
+#endif
+        f->flags=(f->flags & ~(0x4|0x8|0x80)) | (value & (0x4|0x8|0x80));
+        pthread_mutex_unlock(&lock);
+        return 0;
+    }
+    default:
+        pthread_mutex_unlock(&lock);
+        return -EINVAL;
+    }
+}
 static int64_t do_access(const char *guest,int mode) {
     char path[1024];
     int e=translate(guest,path,sizeof(path));
@@ -480,6 +541,14 @@ static ABI int64_t posix_unlink(const char *p) { return posix(path_op(p,2,0)); }
 static ABI int32_t sce_check_reachability(const char *p) {
     GuestStat s; return (int32_t)sce(do_stat(p,&s));
 }
+static ABI int32_t posix_fcntl(int fd,int cmd,intptr_t arg) {
+    int64_t r=do_fcntl(fd,cmd,arg);
+    if (r<0) { *runtime_errno()=runtime_guest_errno((int)-r); return -1; }
+    return (int32_t)r;
+}
+static ABI int32_t sce_fcntl(int fd,int cmd,intptr_t arg) {
+    return (int32_t)sce(do_fcntl(fd,cmd,arg));
+}
 
 static const RuntimeExport exports[]={
     {"sceKernelOpen",sce_open}, {"open",posix_open}, {"_open",posix_open},
@@ -497,6 +566,7 @@ static const RuntimeExport exports[]={
     {"sceKernelTruncate",sce_truncate}, {"truncate",posix_truncate},
     {"sceKernelFsync",sce_fsync}, {"fsync",posix_fsync},
     {"access",posix_access}, {"sceKernelCheckReachability",sce_check_reachability},
+    {"fcntl",posix_fcntl}, {"sceKernelFcntl",sce_fcntl},
     {"sceKernelMkdir",sce_mkdir}, {"mkdir",posix_mkdir},
     {"sceKernelRmdir",sce_rmdir}, {"rmdir",posix_rmdir},
     {"sceKernelUnlink",sce_unlink}, {"unlink",posix_unlink},

@@ -20,6 +20,13 @@
 #define ERR(n) ((int32_t)(UINT32_C(0x80020000)|(n)))
 #define PAGE 16384
 
+/* The loader publishes the main image so module-info queries describe eboot.bin. */
+static uintptr_t main_image, main_segment;
+static uint64_t main_image_size, main_segment_size;
+void runtime_set_main_image(uintptr_t base,uint64_t size,uintptr_t segment,uint64_t segment_size) {
+    main_image=base; main_image_size=size; main_segment=segment; main_segment_size=segment_size;
+}
+
 typedef struct { int64_t sec, nsec; } GuestTimespec;
 typedef struct { int64_t sec, usec; } GuestTimeval;
 
@@ -115,15 +122,27 @@ static ABI int32_t kernel_nanosleep(const GuestTimespec *rq,GuestTimespec *rem) 
     return posix_nanosleep(rq,rem) ? ERR(*runtime_errno()) : 0;
 }
 typedef struct { int32_t minuteswest, dsttime; } GuestTimezone;
+typedef struct { int64_t t; uint32_t west_sec, dst_sec; } KernelTimesec;
+_Static_assert(sizeof(KernelTimesec)==16,"OrbisTimesec layout");
+/* Standard and daylight offsets east of UTC at the given instant. */
+static void host_zone(int64_t seconds,int64_t *standard,int64_t *daylight) {
+    time_t t=(time_t)seconds;
+    struct tm local;
+    if (!localtime_r(&t,&local)) { *standard=0; *daylight=0; return; }
+#ifdef _WIN32
+    int64_t east=(int64_t)compat_utc_offset(t);
+#else
+    int64_t east=(int64_t)local.tm_gmtoff;
+#endif
+    int64_t dst=local.tm_isdst>0 ? 3600 : 0;
+    *daylight=dst; *standard=east-dst;
+}
 static ABI int32_t kernel_gettimezone(GuestTimezone *tz) {
     if (!tz) return ERR(22);
-    time_t now=time(NULL);
-#ifdef _WIN32
-    tz->minuteswest=(int32_t)(-compat_utc_offset(now)/60); tz->dsttime=0;
-#else
-    struct tm local; localtime_r(&now,&local);
-    tz->minuteswest=(int32_t)(-local.tm_gmtoff/60); tz->dsttime=0;
-#endif
+    int64_t standard,daylight;
+    host_zone((int64_t)time(NULL),&standard,&daylight);
+    tz->minuteswest=(int32_t)(standard/60);
+    tz->dsttime=(int32_t)(daylight/60);
     return 0;
 }
 static ABI int32_t posix_gettimeofday(GuestTimeval *tv,GuestTimezone *tz) {
@@ -138,6 +157,27 @@ static ABI int32_t kernel_gettimeofday(GuestTimeval *tv) {
     return posix_gettimeofday(tv,NULL);
 }
 static ABI int64_t posix_time(int64_t *out) { int64_t t=(int64_t)time(NULL); if (out) *out=t; return t; }
+static ABI int32_t kernel_local_to_utc(int64_t local,int64_t options,int64_t *seconds,
+                                       GuestTimezone *timezone,int32_t *dst_seconds) {
+    (void)options;
+    if (!timezone) return ERR(22);
+    int64_t standard,daylight;
+    host_zone(local,&standard,&daylight);
+    timezone->minuteswest=(int32_t)(standard/60);
+    timezone->dsttime=(int32_t)(daylight/60);
+    if (seconds) *seconds=local-standard-daylight;
+    if (dst_seconds) *dst_seconds=(int32_t)daylight;
+    return 0;
+}
+static ABI int32_t kernel_utc_to_local(int64_t utc,int64_t *local,
+                                       KernelTimesec *st,uint64_t *dst_seconds) {
+    int64_t standard,daylight;
+    host_zone(utc,&standard,&daylight);
+    if (local) *local=utc+standard+daylight;
+    if (st) { st->t=utc; st->west_sec=(uint32_t)standard; st->dst_sec=(uint32_t)daylight; }
+    if (dst_seconds) *dst_seconds=(uint64_t)daylight;
+    return 0;
+}
 
 /* ---- process ---- */
 static ABI int32_t get_pagesize(void) { return PAGE; }
@@ -169,6 +209,59 @@ static ABI int32_t module_info_from_addr(uint64_t address,int32_t flags,void *in
     if (flags>=3) return ERR(22);
     if (!info) return ERR(14);
     return ERR(3); /* ESRCH: the runtime keeps no module records */
+}
+typedef struct {
+    uint64_t st_size;
+    char name[256];
+    uint64_t eh_frame_hdr_addr, eh_frame_addr, eh_frame_size;
+    uint64_t seg0_addr, seg0_size;
+} ModuleInfoForUnwind;
+_Static_assert(sizeof(ModuleInfoForUnwind)==304,"OrbisModuleInfoForUnwind layout");
+static ABI int32_t module_info_for_unwind(uint64_t address,int32_t flags,ModuleInfoForUnwind *info) {
+    if (flags<0 || flags>=3) { if (info) memset(info,0,sizeof(*info)); return ERR(22); }
+    if (!info) return ERR(14);
+    if (info->st_size<sizeof(*info)) return ERR(22);
+    memset(info,0,sizeof(*info));
+    info->st_size=sizeof(*info);
+    snprintf(info->name,sizeof(info->name),"eboot.bin");
+    uintptr_t start=0,end=0;
+    int mapped=0;
+    if (main_segment && address>=main_segment && address-main_segment<main_segment_size) {
+        start=main_segment; end=main_segment+main_segment_size;
+    } else if (!runtime_memory_region((uintptr_t)address,&start,&end,&mapped) || !mapped) {
+        return ERR(3); /* ESRCH */
+    }
+    (void)main_image; (void)main_image_size;
+    info->seg0_addr=start; info->seg0_size=end-start;
+    return 0;
+}
+typedef struct { uint64_t address, size; } InternalSegmentInfo;
+_Static_assert(sizeof(InternalSegmentInfo)==16,"InternalSegmentInfo layout");
+static ABI int32_t internal_segment_info(InternalSegmentInfo *result) {
+    if (!result) return ERR(14);
+    if (!main_segment) return ERR(3);
+    result->address=main_segment; result->size=main_segment_size;
+    return 0;
+}
+static ABI int32_t kernel_is_stack(void *address,void **start,void **end) {
+    uintptr_t low,high;
+    if (address && runtime_thread_stack_range((uintptr_t)address,&low,&high)) {
+        if (start) *start=(void *)low;
+        if (end) *end=(void *)high;
+        return 0;
+    }
+    uintptr_t region_start=0,region_end=0;
+    int mapped=0;
+    if (!address || !runtime_memory_region((uintptr_t)address,&region_start,&region_end,&mapped) || !mapped)
+        return ERR(13); /* EACCES */
+    if (start) *start=NULL;
+    if (end) *end=NULL;
+    return 0;
+}
+static ABI int32_t kernel_get_cpumode(void) { return 0; }
+static ABI int32_t kernel_get_gpi(void) { return 0; }
+static ABI int32_t kernel_set_fsst_param(int32_t parameter,int32_t value) {
+    (void)parameter; (void)value; return 0;
 }
 static ABI int32_t kernel_mlock(const void *address,uint64_t size) { (void)address; (void)size; return 0; }
 /* libc's C++ exception unwinder. The game does not throw (no __cxa_throw import): unwinding
@@ -309,7 +402,28 @@ static ABI int32_t posix_key_create(uint32_t *k,KeyDestructor d) { int32_t r=key
 static ABI int32_t posix_key_delete(uint32_t k) { int32_t r=key_delete(k); return r ? r&0xffff : 0; }
 static ABI int32_t posix_key_set(uint32_t k,void *v) { int32_t r=key_set(k,v); return r ? r&0xffff : 0; }
 
+typedef struct { unsigned char bytes[16]; } KernelUuid;
+static ABI int32_t kernel_uuid_create(KernelUuid *uuid) {
+    if (!uuid) return ERR(22);
+#ifndef _WIN32
+    size_t filled = 0;
+    while (filled < sizeof(uuid->bytes)) {
+        ssize_t n = getrandom(uuid->bytes + filled, sizeof(uuid->bytes) - filled, 0);
+        if (n <= 0) break;
+        filled += (size_t)n;
+    }
+#else
+    size_t filled = 0;
+#endif
+    while (filled < sizeof(uuid->bytes)) uuid->bytes[filled++] = (unsigned char)rand();
+    uuid->bytes[6] = (unsigned char)((uuid->bytes[6] & 0x0f) | 0x40);
+    uuid->bytes[8] = (unsigned char)((uuid->bytes[8] & 0x3f) | 0x80);
+    return 0;
+}
+static ABI int32_t kernel_is_neo_mode(void) { return 0; }
+
 static const RuntimeExport exports[]={
+    {"sceKernelUuidCreate",kernel_uuid_create}, {"sceKernelIsNeoMode",kernel_is_neo_mode},
     {"sceKernelClockGettime",kernel_clock_gettime}, {"clock_gettime",posix_clock_gettime},
     {"clock_getres",posix_clock_getres},
     {"sceKernelGetProcessTime",process_time}, {"sceKernelGetProcessTimeCounter",process_time_counter},
@@ -319,6 +433,8 @@ static const RuntimeExport exports[]={
     {"nanosleep",posix_nanosleep}, {"sceKernelNanosleep",kernel_nanosleep},
     {"sceKernelGettimezone",kernel_gettimezone}, {"gettimeofday",posix_gettimeofday},
     {"sceKernelGettimeofday",kernel_gettimeofday},
+    {"sceKernelConvertLocaltimeToUtc",kernel_local_to_utc},
+    {"sceKernelConvertUtcToLocaltime",kernel_utc_to_local},
     {"time",posix_time},
     {"getpagesize",get_pagesize}, {"getpid",get_pid}, {"sched_yield",yield},
     {"_exit",hard_exit},
@@ -326,7 +442,12 @@ static const RuntimeExport exports[]={
     {"sceKernelDebugRaiseExceptionOnReleaseMode",raise_exception},
     {"sceKernelPrintBacktraceWithModuleInfo",print_backtrace},
     {"getargc",get_argc}, {"getargv",get_argv}, {"sceKernelStopUnloadModule",stop_unload_module},
-    {"sceKernelGetModuleInfoFromAddr",module_info_from_addr}, {"sceKernelMlock",kernel_mlock},
+    {"sceKernelGetModuleInfoFromAddr",module_info_from_addr},
+    {"sceKernelGetModuleInfoForUnwind",module_info_for_unwind},
+    {"sceKernelInternalMemoryGetModuleSegmentInfo",internal_segment_info},
+    {"sceKernelIsStack",kernel_is_stack}, {"sceKernelGetCpumode",kernel_get_cpumode},
+    {"sceKernelGetGPI",kernel_get_gpi}, {"sceKernelSetFsstParam",kernel_set_fsst_param},
+    {"sceKernelMlock",kernel_mlock},
     {"__elf_phdr_match_addr",elf_phdr_match_addr}, {"_is_signal_return",is_signal_return},
     {"__pthread_cxa_finalize",pthread_cxa_finalize}, {"sigreturn",unwind_resume},
     {"__Ux86_64_setcontext",unwind_resume},

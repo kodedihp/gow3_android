@@ -784,6 +784,18 @@ int main(int argc, char **argv) {
     image = allocate(round_page(size));
     if (fread(image, 1, size, f) != size || fgetc(f) != EOF) fail("incorrect memory image size");
     fclose(f);
+    {
+        uintptr_t segment=(uintptr_t)image;
+        uint64_t segment_size=size;
+        for (uint64_t i=0;i<ns;++i) {
+            if (!(segments[i].flags&1) || entry<segments[i].address ||
+                entry-segments[i].address>=segments[i].size) continue;
+            segment=(uintptr_t)image+segments[i].address;
+            segment_size=segments[i].size;
+            break;
+        }
+        runtime_set_main_image((uintptr_t)image,size,segment,segment_size);
+    }
     if (!cpu_only) {
         char title[128]="God of War III", serial[16]="UNKNOWN", sfo[4096];
         uint32_t attributes=0;
@@ -918,6 +930,7 @@ int main(int argc, char **argv) {
     /* Tell the guest CPU where this thread's guest stack is, then enter the image through the
      * boundary: it converts to the guest's convention and runs the JIT. */
     guest_cpu_thread_stack(stack+MAIN_STACK-64,MAIN_STACK-64);
+    runtime_thread_set_stack(stack+MAIN_STACK-64,MAIN_STACK-64);
     const uint64_t entry_args[2]={(uint64_t)(uintptr_t)&params,guest_cpu_host_function((void *)guest_exit)};
     guest_cpu_call((uintptr_t)(image+entry),2,entry_args);
 #endif

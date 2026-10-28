@@ -178,6 +178,12 @@ static ABI int32_t save_mount2(const Mount2 *m, MountResult *result) {
     if (!m) return ERR_PARAMETER;
     return mount(m->user,NULL,m->dir,m->mode,result);
 }
+/* No PS4-to-PS5 transfer data exists: report it even for null arguments. */
+static ABI int32_t save_transferring_mount(const void *m, MountResult *result) {
+    (void)m;
+    if (result) memset(result,0,sizeof(*result));
+    return ERR_NOT_FOUND;
+}
 static int slot_of(const MountPoint *point) {
     if (!point || strncmp(point->data,"/savedata",9)) return -1;
     int slot=atoi(point->data+9);
@@ -335,6 +341,7 @@ static const RuntimeExport exports[]={
     {"sceSaveDataInitialize",save_initialize}, {"sceSaveDataInitialize2",save_initialize},
     {"sceSaveDataInitialize3",save_initialize}, {"sceSaveDataTerminate",save_terminate},
     {"sceSaveDataMount",save_mount}, {"sceSaveDataMount2",save_mount2}, {"sceSaveDataUmount",save_umount},
+    {"sceSaveDataTransferringMount",save_transferring_mount},
     {"sceSaveDataSetParam",save_set_param}, {"sceSaveDataSaveIcon",save_icon}, {"sceSaveDataDelete",save_delete},
     {"sceSaveDataDirNameSearch",save_search},
     {"sceSaveDataSetupSaveDataMemory",memory_setup}, {"sceSaveDataGetSaveDataMemory",memory_get},

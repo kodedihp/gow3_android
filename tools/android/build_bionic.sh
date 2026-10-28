@@ -38,26 +38,45 @@ headers=${GOW3_ARM64_HEADERS:-$PWD/.local-deps/root/usr}
 toolchain=$ndk/build/cmake/android.toolchain.cmake
 llvm=$(find "$ndk/toolchains/llvm/prebuilt" -maxdepth 1 -type d -name "*x86_64" | head -1)
 J=${GOW3_JOBS:-22}
+# Fast boot-loop path: reuse the expensive FEX/GPU/Atrac9 artifacts from a previous
+# build and only recompile gow3-probe. If an artifact is missing we fall back to a
+# normal build, so enabling these flags is always safe on a cold checkout.
+reuse_cpu_gpu=${GOW3_REUSE_CPU_GPU:-0}
+reuse_atrac9=${GOW3_REUSE_ATRAC9:-0}
+skip_framegen=${GOW3_SKIP_FRAMEGEN:-0}
+need_cpu_gpu=1
+if [[ $reuse_cpu_gpu == 1 && -f $out/lib/libgow3cpu.so && -f $out/lib/libgow3gpu.so ]]; then
+    need_cpu_gpu=0
+fi
+need_atrac9=1
+if [[ $reuse_atrac9 == 1 && -f $out/libatrac9.a ]]; then
+    need_atrac9=0
+fi
 run() { if command -v taskset >/dev/null 2>&1; then taskset -c 2-23 nice -n 19 "$@"; else "$@"; fi; }
 [[ -f $toolchain ]] || { echo "No NDK: $ndk (tools/android/build_bionic_deps.sh)" >&2; exit 1; }
 [[ -f $prefix/.done-ffmpeg ]] || { echo "No Bionic deps in $prefix (tools/android/build_bionic_deps.sh)" >&2; exit 1; }
 [[ -d $headers/share/cmake/tsl-robin-map ]] || { echo "No header-only packages in $headers" >&2; exit 1; }
-mkdir -p "$out"
+mkdir -p "$out" "$out/bin" "$out/lib"
 ndk_cmake=(-DCMAKE_TOOLCHAIN_FILE="$toolchain" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$api -DANDROID_STL=c++_shared)
 
 # FEX：无 glibc jemalloc hook（仅 glibc；它服务于 thunks，本构建不用）。
-if [[ ! -f $out/fex/build.ninja ]]; then
-    cmake -S third_party/FEX -B "$out/fex" -G Ninja "${ndk_cmake[@]}" \
-        -DCMAKE_BUILD_TYPE=Release -DCMAKE_PROJECT_FEX_INCLUDE="$PWD/cpu/fex_project.cmake" \
-        -DBUILD_TESTING=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF -DBUILD_STEAM_SUPPORT=OFF \
-        -DBUILD_FEX_LINUX_TESTS=OFF -DENABLE_ZYDIS=OFF -DTUNE_ARCH=armv8.2-a -DTUNE_CPU=generic \
-        -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF >/dev/null
+if (( need_cpu_gpu )); then
+    if [[ ! -f $out/fex/build.ninja ]]; then
+        cmake -S third_party/FEX -B "$out/fex" -G Ninja "${ndk_cmake[@]}" \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_PROJECT_FEX_INCLUDE="$PWD/cpu/fex_project.cmake" \
+            -DBUILD_TESTING=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF -DBUILD_STEAM_SUPPORT=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DENABLE_ZYDIS=OFF -DTUNE_ARCH=armv8.2-a -DTUNE_CPU=generic \
+            -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF >/dev/null
+    fi
+    run ninja -C "$out/fex" -j "$J" gow3cpu > "$out/fex-build.log" 2>&1 || { grep -E "error|FAILED" "$out/fex-build.log" | head -40 >&2; exit 1; }
+else
+    echo "Reusing $out/lib/libgow3cpu.so and $out/lib/libgow3gpu.so"
 fi
-run ninja -C "$out/fex" -j "$J" gow3cpu > "$out/fex-build.log" 2>&1 || { grep -E "error|FAILED" "$out/fex-build.log" | head -40 >&2; exit 1; }
 
 # GPU 库：不链接 libvulkan（gpu/shim/vk_driver_loader.cpp dlopen 驱动），无 X11。
 export PKG_CONFIG_PATH=$prefix/lib/pkgconfig:$prefix/share/pkgconfig
 export PKG_CONFIG_LIBDIR=$PKG_CONFIG_PATH
+if (( need_cpu_gpu )); then
 # Boost 仅头文件：优先宿主构建的依赖树，其次宿主机（Homebrew）已装的 CMake 包，
 # 与旧 glibc 构建（build_arm64.sh 用 GOW3_BOOST_DIR 指向 host 包）一致。
 boost_dir=${GOW3_BOOST_DIR:-}
@@ -103,13 +122,14 @@ if [[ ! -f $out/gpu/build.ninja ]]; then
         -Dmagic_enum_DIR="$headers/share/cmake/magic_enum" >/dev/null
 fi
 run ninja -C "$out/gpu" -j "$J" gow3gpu > "$out/gpu-build.log" 2>&1 || { grep -v '^\[' "$out/gpu-build.log" | tail -40 >&2; exit 1; }
+fi
 
-# bin/ 和 lib/ 并排，可执行文件经 $ORIGIN 找 lib/。
-mkdir -p "$out/bin" "$out/lib"
 # 发布产物剥离调试符号（RelWithDebInfo 的 -g 让 libgow3gpu.so 达到 118MB；strip 后与 glibc
 # bundle 的 14MB 同量级）。保留编译目录的未 strip 副本供调试。
-"$llvm/bin/llvm-strip" -o "$out/lib/libgow3cpu.so" "$out/fex/libgow3cpu.so"
-"$llvm/bin/llvm-strip" -o "$out/lib/libgow3gpu.so" "$out/gpu/libgow3gpu.so"
+if (( need_cpu_gpu )); then
+    "$llvm/bin/llvm-strip" -o "$out/lib/libgow3cpu.so" "$out/fex/libgow3cpu.so"
+    "$llvm/bin/llvm-strip" -o "$out/lib/libgow3gpu.so" "$out/gpu/libgow3gpu.so"
+fi
 # gow3gpu 不链接 SDL（AHB present 路径移除）；但 gow3-probe 链接 SDL3：游戏进程用 SDL 音频
 # 子系统（disk 驱动）把 PCM 写进 app 的 FIFO（run-bionic.sh 设 SDL_AUDIO_DRIVER=disk，
 # AudioBridge.java 消费），因此 libSDL3.so 是 payload 的必需项，无条件拷贝。
@@ -124,11 +144,15 @@ cp -f "$prefix/lib/libSDL3.so" "$out/lib/"
 cp -f "$llvm/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" "$out/lib/"
 
 cc=("$llvm/bin/aarch64-linux-android$api-clang" -fuse-ld=lld)
-mkdir -p "$out/atrac9"
-for source in third_party/LibAtrac9/C/src/*.c; do
-    "${cc[@]}" -std=c99 -O2 -g -w -fPIC -c "$source" -o "$out/atrac9/$(basename "${source%.c}").o"
-done
-"$llvm/bin/llvm-ar" rcs "$out/libatrac9.a" "$out"/atrac9/*.o
+if (( need_atrac9 )); then
+    mkdir -p "$out/atrac9"
+    for source in third_party/LibAtrac9/C/src/*.c; do
+        "${cc[@]}" -std=c99 -O2 -g -w -fPIC -c "$source" -o "$out/atrac9/$(basename "${source%.c}").o"
+    done
+    "$llvm/bin/llvm-ar" rcs "$out/libatrac9.a" "$out"/atrac9/*.o
+else
+    echo "Reusing $out/libatrac9.a"
+fi
 # PIE（Android 要求；PC 构建用 -no-pie 服务 brk 堆，见 src/probe.c main）、
 # -rdynamic：libgow3gpu 对可执行文件解析 runtime_* 符号。只链接 NDK sysroot：
 # 无 libvulkan、无我们自己的 loader。runtime_videodec.c 直接调用 avcodec，
@@ -136,16 +160,22 @@ done
 export PKG_CONFIG_SYSROOT_DIR=
 read -r -a pv_includes <<< "$(pkg-config --cflags libavcodec libavutil libswscale libswresample sdl3)"
 read -r -a pv_libraries <<< "$(pkg-config --libs libavcodec libavutil libswscale libswresample sdl3)"
-links=(-L"$out/lib" -lgow3gpu -lgow3cpu -Wl,-rpath,'$ORIGIN/../lib' -rdynamic -pie)
+links=(-L"$out/lib" -lgow3gpu -lgow3cpu -lc++_shared -Wl,-rpath,'$ORIGIN/../lib' -rdynamic -pie)
+"${cc[@]}" -std=c++17 -O2 -g -Wall -Wextra -Werror -pthread -I"$prefix/include" -I. -Isrc \
+    "${pv_includes[@]}" -c src/hle/re7_playable.cpp -o "$out/re7_playable.o"
 "${cc[@]}" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -I"$prefix/include" -I. -Isrc \
     "${pv_includes[@]}" \
-    src/probe.c src/runtime*.c src/vulkan_smoke.c "$out/libatrac9.a" -lm "${links[@]}" \
+    src/probe.c src/runtime*.c src/vulkan_smoke.c "$out/re7_playable.o" "$out/libatrac9.a" -lm -lz "${links[@]}" \
     "${pv_libraries[@]}" \
     -o "$out/bin/gow3-probe"
 "${cc[@]}" -std=c11 -O2 -Wall -Wextra -Werror tools/android/build/kgsl_chip_id.c -pie \
     -o "$out/bin/kgsl-chip-id"
 # 帧生成引擎（change add-native-frame-generation）：libbloodframe.so（MIT，钉 commit，
 # 首次构建需网络 clone）。runtime-manifest 将其列为必需——失败即失败，不静默缺库。
-bash tools/android/build_framegen.sh
+if [[ $skip_framegen == 1 ]]; then
+    echo "Skipping libbloodframe.so (GOW3_SKIP_FRAMEGEN=1; runtime-only test build)"
+else
+    bash tools/android/build_framegen.sh
+fi
 
-echo "Built $out/bin/gow3-probe, $out/lib/libgow3gpu.so, $out/lib/libgow3cpu.so, $out/lib/libbloodframe.so (Bionic, API $api)"
+echo "Built $out/bin/gow3-probe (Bionic, API $api); framegen=$((1 - skip_framegen))"

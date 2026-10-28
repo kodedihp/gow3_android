@@ -403,6 +403,48 @@ static int direct_range_allocated(uint64_t phys, uint64_t size) {
 }
 
 static ABI uint64_t direct_size(void) { return POOL_SIZE; }
+static ABI int32_t available_direct(off_t search_start, off_t search_end, size_t alignment,
+                                    off_t *phys, size_t *size) {
+    if (!phys || !size || alignment < PAGE || (alignment & (alignment - 1))) return INVALID;
+    uint64_t start = search_start > 0 ? (uint64_t)search_start : 0;
+    uint64_t end = search_end > 0 ? (uint64_t)search_end : POOL_SIZE;
+    if (end > POOL_SIZE) end = POOL_SIZE;
+    if (start >= end) return NO_SPACE;
+    uint64_t at = align_up(start, alignment);
+    read_lock();
+    for (;;) {
+        int moved = 0;
+        for (int i = 0; i < LIMIT; ++i) {
+            if (!blocks[i].used) continue;
+            if (at >= blocks[i].start && at - blocks[i].start < blocks[i].size) {
+                at = align_up(blocks[i].start + blocks[i].size, alignment);
+                moved = 1;
+                break;
+            }
+        }
+        if (!moved) break;
+        if (at >= end) {
+            read_unlock();
+            return NO_SPACE;
+        }
+    }
+    uint64_t limit = end;
+    for (int i = 0; i < LIMIT; ++i) {
+        if (blocks[i].used && blocks[i].start > at && blocks[i].start < limit)
+            limit = blocks[i].start;
+    }
+    read_unlock();
+    *phys = (off_t)at;
+    *size = (size_t)(limit - at);
+    return 0;
+}
+static ABI int32_t available_flexible(size_t *size) {
+    if (!size) return INVALID;
+    read_lock();
+    *size = (size_t)(FLEXIBLE_SIZE - flexible_bytes);
+    read_unlock();
+    return 0;
+}
 static ABI int32_t direct_allocate(int64_t low, int64_t high, uint64_t size,
                                   uint64_t alignment, int type, int64_t *out) {
     if (!alignment) alignment = PAGE;
@@ -646,6 +688,8 @@ static ABI int32_t batch_map(BatchEntry *entries, int count, int *processed) {
 static const RuntimeExport exports[]={
     {"mmap",posix_mmap}, {"msync",posix_msync},
     {"sceKernelGetDirectMemorySize",direct_size}, {"sceKernelAllocateDirectMemory",direct_allocate},
+    {"sceKernelAvailableDirectMemorySize",available_direct},
+    {"sceKernelAvailableFlexibleMemorySize",available_flexible},
     {"sceKernelMapDirectMemory",direct_map}, {"sceKernelMapNamedDirectMemory",direct_map_named},
     {"sceKernelReleaseDirectMemory",direct_release}, {"sceKernelMunmap",direct_unmap}, {"munmap",direct_unmap},
     {"sceKernelMapFlexibleMemory",map_flexible}, {"sceKernelMapNamedFlexibleMemory",map_flexible_named},
@@ -659,6 +703,8 @@ uintptr_t runtime_memory_resolve(const char *name) {
     if (!strcmp(name, "pO96TwzOm5E#libkernel")) return (uintptr_t)direct_size;
     if (!strcmp(name, "rTXw65xmLIA#libkernel")) return (uintptr_t)direct_allocate;
     if (!strcmp(name, "L-Q3LEjIbgA#libkernel")) return (uintptr_t)direct_map;
+    if (!strcmp(name, "C0f7TJcbfac#libkernel")) return (uintptr_t)available_direct;
+    if (!strcmp(name, "aNz11fnnzi4#libkernel")) return (uintptr_t)available_flexible;
     if (!strcmp(name, "MBuItvba6z8#libkernel")) return (uintptr_t)direct_release;
     if (!strcmp(name, "cQke9UuBQOk#libkernel")) return (uintptr_t)direct_unmap;
     return RUNTIME_LOOKUP(exports,name);

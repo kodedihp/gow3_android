@@ -139,6 +139,45 @@ void runtime_thread_attach_main(void) {
     GuestThread *t=runtime_thread_current();
     snprintf(t->name,sizeof(t->name),"main");
 }
+/* The loader tells us where the main thread's guest stack lives (JIT builds). */
+void runtime_thread_set_stack(void *top,size_t size) {
+    if (!top || !size) return;
+    GuestThread *t=runtime_thread_current();
+    pthread_mutex_lock(&lock);
+    t->guest_stack=(unsigned char *)top-size;
+    t->guest_stack_size=size;
+    pthread_mutex_unlock(&lock);
+}
+int runtime_thread_stack_range(uintptr_t address,uintptr_t *start,uintptr_t *end) {
+    if (!address) return 0;
+    int found=0;
+    uintptr_t low=0,high=0;
+    pthread_mutex_lock(&lock);
+    for (GuestThread *t=threads;t;t=t->next) {
+        if (!t->guest_stack || !t->guest_stack_size) continue;
+        uintptr_t base=(uintptr_t)t->guest_stack;
+        if (address>=base && address-base<t->guest_stack_size) {
+            low=base; high=base+t->guest_stack_size; found=1; break;
+        }
+    }
+    pthread_mutex_unlock(&lock);
+#ifndef _WIN32
+    if (!found) {
+        pthread_attr_t attr;
+        void *base=NULL;
+        size_t size=0;
+        if (!pthread_getattr_np(pthread_self(),&attr)) {
+            if (!pthread_attr_getstack(&attr,&base,&size) && base && size &&
+                address>=(uintptr_t)base && address-(uintptr_t)base<size) {
+                low=(uintptr_t)base; high=low+size; found=1;
+            }
+            pthread_attr_destroy(&attr);
+        }
+    }
+#endif
+    if (found) { if (start) *start=low; if (end) *end=high; }
+    return found;
+}
 static GuestThread *find_thread(void *handle) {
     GuestThread *found=NULL;
     pthread_mutex_lock(&lock);

@@ -3,6 +3,10 @@
 #include "runtime.h"
 #include "guest_cpu.h"
 #include "gpu/gow3gpu.h"
+#ifdef __ANDROID__
+void *re7_hle_resolve_symbol(const char *name);
+void *re7_hle_resolve_nid(const char *nid);
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -238,8 +242,12 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
     if (memory) return memory;
     uintptr_t kernel = runtime_kernel_resolve(name);
     if (kernel) return kernel;
+    uintptr_t eventflag = runtime_eventflag_resolve(name);
+    if (eventflag) return eventflag;
     uintptr_t services = runtime_services_resolve(name);
     if (services) return services;
+    uintptr_t zlib = runtime_zlib_resolve(name);
+    if (zlib) return zlib;
     uintptr_t ajm = runtime_ajm_resolve(name);
     if (ajm) return ajm;
     uintptr_t videodec = runtime_videodec_resolve(name);
@@ -254,7 +262,24 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
     if (save) return save;
     uintptr_t file = runtime_file_resolve(name);
     if (file) return file;
-    return gow3gpu_resolve(name);
+    uintptr_t gpu = gow3gpu_resolve(name);
+    if (gpu) return gpu;
+#ifdef __ANDROID__
+    const char *separator = strchr(name, '#');
+    if (separator) {
+        char nid[12];
+        size_t length = (size_t)(separator - name);
+        if (length == 11) {
+            memcpy(nid, name, length);
+            nid[length] = 0;
+            uintptr_t re7 = (uintptr_t)re7_hle_resolve_nid(nid);
+            if (re7) return re7;
+        }
+    }
+    return (uintptr_t)re7_hle_resolve_symbol(name);
+#else
+    return 0;
+#endif
 }
 static const struct { const char *nid, *symbol; } import_names[]={
 #include "import_names.inc"
