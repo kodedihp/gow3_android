@@ -1,6 +1,6 @@
 # START — Checkpoint RE7 Android
 
-Terakhir diperbarui: **2026-10-28 05:49 UTC**
+Terakhir diperbarui: **2026-10-28 05:55 UTC**
 
 ## Aturan sinkronisasi
 
@@ -14,16 +14,16 @@ Terakhir diperbarui: **2026-10-28 05:49 UTC**
 
 - Repo: `/data/data/com.termux/files/home/gow3_android`
 - Branch: `feat/re7-playable`
-- Commit terakhir: `b03048f ci(android): cache bionic runtime and fix APK signing/tooling for new package`
+- Commit kode terakhir: `19d2e2e feat(re7): implement P0 boot imports and fast runtime CI` (sudah di-push ke `origin/feat/re7-playable`)
 - Target: menjalankan **Resident Evil 7 PS4 CUSA03842** di Android.
 - Pendekatan: runtime repo (`src/runtime_*`) + fallback HLE RE7 (`src/hle/re7_playable.cpp`), memakai referensi shadPS4, AnyPS5, dynlib, dan port PS4 lain.
 
 ## Status sinkronisasi saat ini
 
-- Perubahan kerja **belum di-commit dan belum di-push**.
-- Banyak perubahan berasal dari sesi sebelumnya; jangan menganggap semuanya sudah masuk CI.
-- `START.MD` ini juga belum di-commit.
-- Submodule yang terlihat berubah (`third_party/FEX`, `gpu/third_party/*`) adalah kondisi working tree; periksa sebelum commit.
+- Perubahan P0, checkpoint, peta import, dan workflow sudah **di-commit dan di-push** (`19d2e2e`).
+- CI runtime `re7-runtime-fast` run `40640566995` sedang berjalan (trigger push `19d2e2e`).
+- Submodule (`third_party/FEX`, `gpu/third_party/*`) tetap kotor di working tree dan **tidak** ikut di-commit; itu perubahan konten lokal, bukan pointer submodule.
+- Perubahan `START.MD` ini di-commit terpisah sebagai checkpoint; status CI di dalamnya adalah snapshot 05:55 UTC dan boleh berubah setelah run selesai.
 
 ## Yang sudah selesai
 
@@ -51,20 +51,20 @@ Terakhir diperbarui: **2026-10-28 05:49 UTC**
   - `tools/android/build_bionic_fast.sh`
   - `.github/workflows/re7-runtime.yml`
   - reuse `libgow3cpu.so`, `libgow3gpu.so`, `libatrac9.a`; hanya rebuild `gow3-probe`.
-  - `bash -n` dan `git diff --check` lulus; build nyata belum dijalankan.
+  - `bash -n`, `git diff --check`, dan syntax check API 30 lulus; build CI sedang berjalan.
 
 ## Status fase
 
 ### Fase 0 — Baseline / loop uji
 
-- Fast-path build sudah dibuat.
-- Belum di-commit/push.
-- Belum ada build CI runtime baru.
+- Fast-path build sudah dibuat dan sudah di-push.
+- CI runtime pertama sudah berjalan: run `40640566995` (`in_progress` per 05:55 UTC).
+- Artifact `re7-runtime-<sha>` belum diunduh.
 - Baseline `--check-imports` dan run `--timeout 60` belum dijalankan untuk kode terbaru.
 
 ### Fase 1 — P0
 
-**Implementasi selesai di working tree; belum dibuktikan build CI.** Syntax check API 30 lulus, host unit test zlib/fcntl/time/module-info lulus.
+**Implementasi selesai, sudah di-commit (`19d2e2e`); build CI sedang berjalan.** Syntax check API 30 lulus, host unit test zlib/fcntl/time/module-info lulus.
 
 18 P0:
 
@@ -188,10 +188,13 @@ Terakhir diperbarui: **2026-10-28 05:49 UTC**
 bash tools/android/build_bionic_fast.sh
 ```
 
-Workflow:
+Trigger aktual: **push ke `feat/re7-playable`** yang menyentuh path workflow. `gh workflow run re7-runtime-fast.yml` gagal 404 karena workflow belum ada di default branch (`android`), jadi gunakan push atau commit pemicu.
+
+Pantau run:
 
 ```bash
-gh workflow run re7-runtime-fast.yml --ref feat/re7-playable
+gh run list --branch feat/re7-playable --limit 3
+gh run watch <run-id> --interval 20 --exit-status
 ```
 
 Artifact: `re7-runtime-<sha>` berisi `out/bionic/bin/gow3-probe`, `kgsl-chip-id`, dan `*.so`.
@@ -209,11 +212,10 @@ Jangan gunakan fast path bila `cpu/**`, `gpu/**`, atau `third_party/LibAtrac9/**
 
 ## Langkah berikutnya
 
-1. Sinkronkan checkpoint ini dengan `git status` sebelum mulai.
-2. Implementasi P0 di `src/runtime_kernel.c`, `src/runtime_file.c`, `src/runtime_savedata.c`, dan `src/runtime_zlib.c` baru.
-3. Tambah mapping NID P0 di `src/import_names.inc`.
-4. Tambah `-lz` di build Android/Windows bila zlib memakai host zlib.
-5. ~~Jalankan syntax check API 30 + unit test zlib/fcntl/time.~~ Sudah lulus (`ZTEST_OK`, `FTEST_OK`, `KTEST_OK`).
-6. Commit/push setelah disetujui, lalu trigger `re7-runtime-fast`.
-7. Unduh artifact, jalankan `--check-imports` dan `--timeout 60`, catat STOP pertama.
-8. Lanjut loop Fase 2 sampai entry/menu; jangan mengejar 270 import sekaligus.
+1. Tunggu run `40640566995`; jika gagal, ambil log job dan perbaiki build.
+2. Unduh artifact `re7-runtime-19d2e2e` setelah run sukses.
+3. Jalankan `gow3-probe --check-imports`, catat import yang benar-benar dipanggil.
+4. Jalankan `gow3-probe --timeout 60`, catat STOP pertama.
+5. ~~Implementasi P0, mapping NID, `-lz`, syntax check, host test.~~ Sudah selesai (`ZTEST_OK`, `FTEST_OK`, `KTEST_OK`).
+6. Lanjut loop Fase 2 sampai entry/menu; jangan mengejar 270 import sekaligus.
+7. Commit/push checkpoint ini setelah status CI berubah.
