@@ -36,3 +36,7 @@ foreach(target gow3present gow3prepare)
     target_link_options(${target} PRIVATE
             -Wl,--gc-sections -Wl,-z,max-page-size=16384)
 endforeach()
+
+# --- RE7 Playable HLE Integration ---
+target_sources(gow3present PRIVATE "../../../../../src/hle/re7_playable.cpp")
+target_include_directories(gow3present PRIVATE "../../../../../src/hle")
