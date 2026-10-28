@@ -13,13 +13,13 @@ val steamLibs = rootProject.file("../.local-deps/android/steam-libs")
 val steamAvailable = steamLibs.resolve("jars.txt").isFile
 
 android {
-    namespace = "com.gow3.android"
+    namespace = "com.resident.evil7.bionic"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.gow3.android.bionic"
+        applicationId = "com.resident.evil7.bionic"
         minSdk = 28
         targetSdk = 28
         versionCode = 4
