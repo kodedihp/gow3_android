@@ -59,10 +59,18 @@ if [[ -n ${GOW3_KEYSTORE_PASSWORD:-} || -n ${GOW3_KEY_ALIAS:-} || -n ${GOW3_KEY_
 else
     if [[ ! -f $key ]]; then
         mkdir -p "$(dirname "$key")"
+        keytool_bin=${KEYTOOL:-}
+        if [[ -z $keytool_bin && -n ${JAVA_HOME:-} && -x $JAVA_HOME/bin/keytool ]]; then
+            keytool_bin=$JAVA_HOME/bin/keytool
+        fi
+        if [[ -z $keytool_bin ]]; then
+            keytool_bin=$(command -v keytool || true)
+        fi
+        [[ -n $keytool_bin ]] || { echo 'build_release_apk: keytool not found (set KEYTOOL or JAVA_HOME)' >&2; exit 1; }
         echo "build_release_apk: generating a local development key at $key" >&2
-        keytool -genkeypair -keystore "$key" -storepass android -keypass android -alias gow3 \
-            -dname 'CN=gow3-android local development' -keyalg RSA -keysize 2048 -validity 10000 \
-            >/dev/null 2>&1 ||
+        rm -f -- "$key"
+        "$keytool_bin" -genkeypair -noprompt -keystore "$key" -storepass android -keypass android -alias gow3 \
+            -dname 'CN=gow3-android local development' -keyalg RSA -keysize 2048 -validity 10000 ||
             { echo "build_release_apk: keytool failed to create $key" >&2; exit 1; }
     fi
     key_alias=gow3
@@ -74,7 +82,7 @@ mkdir -p out/release
     --ks-pass "$ks_pass" --key-pass "$key_pass" \
     --out "$apk" "$unsigned"
 "$bt/apksigner" verify --verbose "$apk" >/dev/null
-"$bt/aapt" dump badging "$apk" | grep -F com.gow3.android.bionic >/dev/null
+"$bt/aapt" dump badging "$apk" | grep -F com.resident.evil7.bionic >/dev/null
 unzip -l "$apk" | grep -F lib/arm64-v8a/libgow3 >/dev/null
 python3 tools/android/apk/validate_release_apk.py "$apk" --aapt "$bt/aapt" \
     --manifest tools/android/runtime/runtime-manifest.bionic.json

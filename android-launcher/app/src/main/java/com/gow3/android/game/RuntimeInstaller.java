@@ -65,7 +65,7 @@ final class RuntimeInstaller {
      *  instead of silently writing into filesDir paths the payload's manifest disagrees with. */
     static void validateRuntime(File root, String applicationId) throws Exception {
         // debug 变体的包名带 ".debug" 后缀（build.gradle.kts applicationIdSuffix），payload
-        // 仍按基础 id（com.gow3.android.bionic）发布且同源同 sha256，因此比较前剥掉后缀。
+        // 仍按基础 id（com.resident.evil7.bionic）发布且同源同 sha256，因此比较前剥掉后缀。
         String manifestId = applicationId.endsWith(".debug")
                 ? applicationId.substring(0, applicationId.length() - ".debug".length())
                 : applicationId;

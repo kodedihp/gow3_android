@@ -25,7 +25,7 @@ public class RuntimeInstallerTest {
     private static final String MANIFEST =
             // java_package 必须是统一后的 bridge 包（consolidate-android-launcher-architecture：
             // ro.cobrabm.fexdroid → com.gow3.android.game），validateRuntime 按它拒绝异包 payload。
-            "{\"schema_version\": 1, \"application_id\": \"com.gow3.android.bionic\","
+            "{\"schema_version\": 1, \"application_id\": \"com.resident.evil7.bionic\","
             + " \"java_package\": \"com.gow3.android.game\"}";
 
     /** A minimal but complete Bionic runtime tree, the shape the installer accepts. */
@@ -64,14 +64,14 @@ public class RuntimeInstallerTest {
     @Test
     public void completeBionicTreeIsAccepted() throws Exception {
         File tree = bionicTree(tmp.newFolder());
-        RuntimeInstaller.validateRuntime(tree, "com.gow3.android.bionic");
+        RuntimeInstaller.validateRuntime(tree, "com.resident.evil7.bionic");
     }
 
     /** debug 变体包名带 ".debug" 后缀（applicationIdSuffix），payload 仍按基础 id 发布，必须放行。 */
     @Test
     public void debugSuffixedApplicationIdAcceptsBaseManifest() throws Exception {
         File tree = bionicTree(tmp.newFolder());
-        RuntimeInstaller.validateRuntime(tree, "com.gow3.android.bionic.debug");
+        RuntimeInstaller.validateRuntime(tree, "com.resident.evil7.bionic.debug");
     }
 
     /** 后缀只在尾部剥：中间带 .debug 的异包 id 仍要拒绝。 */
@@ -86,9 +86,9 @@ public class RuntimeInstallerTest {
     public void manifestOfAnotherApplicationIdIsRefused() throws Exception {
         File tree = bionicTree(tmp.newFolder());
         // 旧 glibc 包的 manifest：Bionic 包里装它，payload 会写进另一个包的路径契约
-        write(tree, "runtime-manifest.json", MANIFEST.replace("com.gow3.android.bionic", "com.gow3.android"));
+        write(tree, "runtime-manifest.json", MANIFEST.replace("com.resident.evil7.bionic", "com.gow3.android"));
         assertThrows(IllegalStateException.class,
-                () -> RuntimeInstaller.validateRuntime(tree, "com.gow3.android.bionic"));
+                () -> RuntimeInstaller.validateRuntime(tree, "com.resident.evil7.bionic"));
     }
 
     @Test
@@ -96,7 +96,7 @@ public class RuntimeInstallerTest {
         File tree = bionicTree(tmp.newFolder());
         assertTrue(new File(tree, "runtime-manifest.json").delete());
         assertThrows(IllegalStateException.class,
-                () -> RuntimeInstaller.validateRuntime(tree, "com.gow3.android.bionic"));
+                () -> RuntimeInstaller.validateRuntime(tree, "com.resident.evil7.bionic"));
     }
 
     @Test
@@ -107,7 +107,7 @@ public class RuntimeInstallerTest {
             File tree = bionicTree(tmp.newFolder());
             deleteRecursively(new File(tree, missing));
             assertThrows("缺少 " + missing + " 应被拒绝", IllegalStateException.class,
-                    () -> RuntimeInstaller.validateRuntime(tree, "com.gow3.android.bionic"));
+                    () -> RuntimeInstaller.validateRuntime(tree, "com.resident.evil7.bionic"));
         }
     }
 
@@ -116,7 +116,7 @@ public class RuntimeInstallerTest {
         File tree = bionicTree(tmp.newFolder());
         assertTrue(new File(tree, "gow3port/bionic/bin/gow3-probe").setExecutable(false));
         assertThrows(IllegalStateException.class,
-                () -> RuntimeInstaller.validateRuntime(tree, "com.gow3.android.bionic"));
+                () -> RuntimeInstaller.validateRuntime(tree, "com.resident.evil7.bionic"));
     }
 
     @Test
@@ -124,7 +124,7 @@ public class RuntimeInstallerTest {
         File tree = bionicTree(tmp.newFolder());
         write(tree, "gow3port/rootfs/bin/sh", "x");
         assertThrows(IllegalStateException.class,
-                () -> RuntimeInstaller.validateRuntime(tree, "com.gow3.android.bionic"));
+                () -> RuntimeInstaller.validateRuntime(tree, "com.resident.evil7.bionic"));
     }
 
     /** 8.4 的收口：glibc 形状的 payload 必须被拒绝，而不是像以前那样回落校验后装进设备。 */
@@ -152,7 +152,7 @@ public class RuntimeInstallerTest {
         makeExecutable(tree, "gow3port/arm64/bin/gow3-probe");
         makeExecutable(tree, "rootfs/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1");
         assertThrows("glibc payload 装上也跑不了（启动分支已删），必须拒绝", IllegalStateException.class,
-                () -> RuntimeInstaller.validateRuntime(tree, "com.gow3.android.bionic"));
+                () -> RuntimeInstaller.validateRuntime(tree, "com.resident.evil7.bionic"));
     }
 
     // ---- promote: the transactional swap ----

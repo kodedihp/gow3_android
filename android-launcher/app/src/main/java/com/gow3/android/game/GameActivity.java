@@ -41,7 +41,7 @@ import com.gow3.android.game.drawer.GameDrawerCallbacks;
 /** God of War III-only Android player. Keeps the game surface alive beneath its sliding drawer. */
 public final class GameActivity extends Activity
         implements SaveDialogHost, GameDrawerCallbacks, GameDrawer.Listener {
-    /** The app's files (application id com.gow3.android.bionic) and its gow3port runtime tree.
+    /** The app's files (application id com.resident.evil7.bionic) and its gow3port runtime tree.
      *  Rootfs programs are launched through the in-tree loader when their PT_INTERP slot cannot
      *  hold the app-private path. */
     private String FILES, ROOT, BASE, DATA;

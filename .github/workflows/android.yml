@@ -118,6 +118,16 @@ jobs:
           key: android-${{ runner.os }}-${{ hashFiles('tools/android/**', 'cpu/**', 'gpu/CMakeLists.txt', 'gpu/third_party/**', 'ci/**') }}
           restore-keys: android-${{ runner.os }}-
 
+      - name: Restore Bionic dependency cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .local-deps/android/bionic-prefix
+            .local-deps/android/bionic-src
+            .local-deps/android/bionic-build
+            .local-deps/android/src/bloodframe
+          key: bionic-deps-${{ runner.os }}-${{ hashFiles('tools/android/build_bionic_deps.sh', 'ci/environment.yml') }}
+
       - name: Build pinned host dependencies
         shell: bash -el {0}
         run: bash ci/setup-deps.sh "$CONDA_PREFIX"
@@ -190,7 +200,20 @@ jobs:
       # Vulkan 驱动不进 payload：设备侧由 DriverManager / install_bionic_driver.sh 安装
       # adrenotools 风格驱动包（下载源见 launcher assets driver_sources.json）。
 
+      # APK-only changes (launcher Kotlin/Java, resources, packaging scripts) do not change the
+      # runtime. Cache the final Bionic bin/lib artifacts keyed by every runtime input so those
+      # runs skip the 13+ minute native build and only rebuild the APK.
+      - name: Restore Bionic runtime cache
+        id: bionic-runtime-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            out/bionic/bin
+            out/bionic/lib
+          key: bionic-runtime-${{ runner.os }}-${{ hashFiles('src/**', 'cpu/**', 'gpu/**', 'third_party/FEX/**', 'third_party/LibAtrac9/**', 'tools/android/build_bionic.sh', 'tools/android/build_bionic_deps.sh', 'tools/android/build_framegen.sh', 'tools/android/lsfg/**', 'ci/environment.yml') }}
+
       - name: Build the Bionic runtime
+        if: steps.bionic-runtime-cache.outputs.cache-hit != 'true'
         shell: bash -el {0}
         run: |
           bash tools/android/build_bionic_deps.sh
