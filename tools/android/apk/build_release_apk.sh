@@ -13,7 +13,7 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")/../../.."
 root=$PWD
 version=$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' android-launcher/app/build.gradle.kts)
-apk="out/release/God of War III-bionic-$version.apk"
+apk="out/release/Resident Evil 7-bionic-$version.apk"
 
 # Steam sign-in libraries (SteamDllDialog.java); fetched on demand like the debug payload.
 [[ -f .local-deps/android/steam-libs/jars.txt ]] || bash tools/android/inputs/fetch_steam_libs.sh
